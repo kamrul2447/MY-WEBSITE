@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dino Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body {
+  margin: 0;
+  background: #0b0f1a;
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#game {
+  position: relative;
+  width: 95vw;
+  max-width: 1000px;
+  height: 50vh;
+  max-height: 400px;
+  background: #111827;
+  overflow: hidden;
+  border: 3px solid #00f5ff;
+  border-radius: 20px;
+}
+
+#dino {
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  width: 10%;
+  max-width: 60px;
+  height: auto;
+}
+
+.cactus, .bird, .coin, .tree {
+  position: absolute;
+  height: auto;
+}
+
+.cactus { bottom: 0; }
+.bird { width: 10%; max-width: 40px; }
+.coin { width: 5%; max-width: 20px; }
+.tree { bottom: 0; width: 12%; opacity:0.6; }
+
+#score, #coinScore {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  color: white;
+  font-weight: bold;
+}
+#coinScore { color: yellow; top: 35px; }
+
+button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.3rem;
+  padding: 12px 25px;
+  background: #00f5ff;
+  color: #111827;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  z-index: 100;
+}
+</style>
+</head>
+<body>
+
+<div id="game">
+  <img id="dino" src="dinasour.png">
+  <div id="score">Score: 0</div>
+  <div id="coinScore">Coins: 0</div>
+  <button id="startBtn">Start Game</button>
+  <button id="replayBtn" style="display:none;">Replay</button>
+</div>
+
+<script>
+const dino = document.getElementById("dino");
+const game = document.getElementById("game");
+const scoreEl = document.getElementById("score");
+const coinScoreEl = document.getElementById("coinScore");
+const startBtn = document.getElementById("startBtn");
+const replayBtn = document.getElementById("replayBtn");
+
+let gameOver = false;
+let isJumping = false;
+let dinoBottom = 0;
+let score = 0;
+let coins = 0;
+let obstacles = [];
+let coinsArr = [];
+let trees = [];
+
+// --- Jump ---
+function jump() {
+  if(isJumping || gameOver) return;
+  isJumping = true;
+  let upInterval = setInterval(() => {
+    if(dinoBottom >= game.clientHeight*0.5){
+      clearInterval(upInterval);
+      let downInterval = setInterval(()=>{
+        if(dinoBottom <= 0){
+          clearInterval(downInterval);
+          isJumping = false;
+        }
+        dinoBottom -= game.clientHeight*0.02;
+        dino.style.bottom = dinoBottom + "px";
+      },20);
+    }
+    dinoBottom += game.clientHeight*0.02;
+    dino.style.bottom = dinoBottom + "px";
+  },20);
+}
+
+// --- Cactus generator with size variation and stacking ---
+function createObstacle(){
+  if(gameOver) return;
+
+  let numCactus = Math.random()<0.3 ? 2 : 1; // sometimes stacked
+  for(let i=0; i<numCactus; i++){
+    let obs = document.createElement("img");
+    obs.src = "cactus.png";
+    obs.className = "cactus";
+
+    // random scale small/medium/large
+    let scale = Math.random()*0.5 + 0.5; // 0.5x to 1x
+    obs.style.width = scale*8 + "%";
+    obs.style.maxWidth = scale*30 + "px";
+
+    // if stacked, offset each cactus horizontally
+    obs.style.left = (game.clientWidth + i*30) + "px";
+
+    game.appendChild(obs);
+    obstacles.push({el: obs, type:"cactus"});
+  }
+}
+
+// --- Bird generator ---
+function createBird(){
+  if(gameOver) return;
+  let bird = document.createElement("img");
+  bird.src="bird.png";
+  bird.className="bird";
+  bird.style.bottom=(Math.random()*0.4+0.4)*game.clientHeight+"px";
+  bird.style.left=game.clientWidth+"px";
+  game.appendChild(bird);
+  obstacles.push({el:bird,type:"bird"});
+}
+
+// --- Coin generator ---
+function createCoin(){
+  if(gameOver) return;
+  let coin = document.createElement("img");
+  coin.src = "coin.png";
+  coin.className="coin";
+  coin.style.bottom=(Math.random()*0.5+0.15)*game.clientHeight+"px";
+  coin.style.left=game.clientWidth+"px";
+  game.appendChild(coin);
+  coinsArr.push(coin);
+}
+
+// --- Tree background ---
+function createTree(){
+  if(gameOver) return;
+  let tree = document.createElement("img");
+  tree.src="tree.png";
+  tree.className="tree";
+  tree.style.left=game.clientWidth+"px";
+  game.appendChild(tree);
+  trees.push(tree);
+}
+
+// --- Game Loop ---
+let lastObstacleTime=0, lastBirdTime=0, lastCoinTime=0, lastTreeTime=0;
+function gameLoop(timestamp){
+  if(gameOver) return;
+
+  // Obstacles every 1-3 sec
+  if(timestamp - lastObstacleTime > Math.random()*2000 + 1000){
+    createObstacle();
+    lastObstacleTime=timestamp;
+  }
+
+  // Birds every 3-6 sec
+  if(timestamp - lastBirdTime > Math.random()*3000 + 2000){
+    createBird();
+    lastBirdTime=timestamp;
+  }
+
+  // Coins every 3-8 sec
+  if(timestamp - lastCoinTime > Math.random()*5000 + 3000){
+    createCoin();
+    lastCoinTime=timestamp;
+  }
+
+  // Trees every 4-7 sec
+  if(timestamp - lastTreeTime > Math.random()*3000 + 4000){
+    createTree();
+    lastTreeTime=timestamp;
+  }
+
+  // Move obstacles
+  obstacles.forEach((obs,i)=>{
+    let speed = obs.type==="cactus"?6:8;
+    let left = parseFloat(obs.el.style.left);
+    left-=speed;
+    obs.el.style.left=left+"px";
+
+    // Collision detection
+    let dHeight=dino.clientHeight;
+    if(left < dino.offsetLeft+dino.clientWidth &&
+       left+obs.el.clientWidth > dino.offsetLeft &&
+       dinoBottom < (obs.type==="cactus"? obs.el.clientHeight*0.8 : parseFloat(obs.el.style.bottom)+obs.el.clientHeight) &&
+       (obs.type==="cactus" || dinoBottom+dHeight > parseFloat(obs.el.style.bottom))){
+      endGame();
+    }
+
+    if(left+obs.el.clientWidth<0){
+      obs.el.remove();
+      obstacles.splice(i,1);
+      score++;
+      scoreEl.innerText="Score: "+score;
+    }
+  });
+
+  // Move coins
+  coinsArr.forEach((c,i)=>{
+    let left=parseFloat(c.style.left);
+    left-=6;
+    c.style.left=left+"px";
+
+    if(left<dino.offsetLeft+dino.clientWidth &&
+       left+c.clientWidth>dino.offsetLeft &&
+       dinoBottom < parseFloat(c.style.bottom)+c.clientHeight &&
+       dinoBottom+dino.clientHeight>parseFloat(c.style.bottom)){
+         coins++;
+         coinScoreEl.innerText="Coins: "+coins;
+         c.remove();
+         coinsArr.splice(i,1);
+    }
+
+    if(left+c.clientWidth<0){
+      c.remove();
+      coinsArr.splice(i,1);
+    }
+  });
+
+  // Move trees slower for parallax
+  trees.forEach((t,i)=>{
+    let left=parseFloat(t.style.left);
+    left-=2; // slow speed
+    t.style.left=left+"px";
+    if(left+t.clientWidth<0){
+      t.remove();
+      trees.splice(i,1);
+    }
+  });
+
+  requestAnimationFrame(gameLoop);
+}
+
+// --- End Game ---
+function endGame(){
+  gameOver=true;
+  replayBtn.style.display="block";
+}
+
+// --- Restart Game ---
+function restartGame(){
+  obstacles.forEach(o=>o.el.remove());
+  coinsArr.forEach(c=>c.remove());
+  trees.forEach(t=>t.remove());
+  obstacles=[]; coinsArr=[]; trees=[];
+
+  dinoBottom=0; dino.style.bottom="0px";
+  score=0; coins=0;
+  scoreEl.innerText="Score: 0";
+  coinScoreEl.innerText="Coins: 0";
+  gameOver=false;
+  replayBtn.style.display="none";
+  requestAnimationFrame(gameLoop);
+}
+
+// --- Start Game ---
+function startGame(){
+  startBtn.style.display="none";
+  requestAnimationFrame(gameLoop);
+}
+
+// --- Controls ---
+document.addEventListener("keydown",(e)=>{if(e.code==="Space") jump();});
+document.addEventListener("touchstart", jump);
+document.addEventListener("mousedown", jump);
+startBtn.addEventListener("click", startGame);
+replayBtn.addEventListener("click", restartGame);
+</script>
+</body>
+</html>
