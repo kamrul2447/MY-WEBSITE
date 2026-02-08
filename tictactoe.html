@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Neon Tic Tac Toe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <style>
+        body{
+            margin:0;
+            font-family: Arial, sans-serif;
+            background:#0b0f1a;
+            overflow:hidden;
+            color:white;
+        }
+
+        /* ===== Board ===== */
+        .board{
+            position:absolute;
+            top:50%;
+            left:50%;
+            transform:translate(-50%,-50%);
+            display:grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap:18px;
+            z-index:1;
+        }
+
+        .cell{
+            border-radius:22px;
+            border:2px solid #00f5ff;
+            box-shadow:0 0 18px #00f5ff;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            font-size:48px;
+            cursor:pointer;
+            background:#0f172a;
+        }
+
+        .symbol{
+            text-shadow:0 0 25px white,0 0 50px white;
+        }
+
+        .turnIndicator{
+            position:fixed;
+            left:50%;
+            transform:translateX(-50%);
+            width:85%;
+            height:90px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:22px;
+            transition:all .5s ease;
+            z-index:2;
+        }
+
+        .blueTurn{
+            bottom:0;
+            border-radius:0 0 140px 140px;
+            background:rgba(0,150,255,0.18);
+            border:2px solid #00aaff;
+            box-shadow:0 0 30px #00aaff;
+        }
+
+        .redTurn{
+            top:0;
+            border-radius:140px 140px 0 0;
+            background:rgba(255,0,80,0.18);
+            border:2px solid #ff0040;
+            box-shadow:0 0 30px #ff0040;
+        }
+
+        .overlay{
+            position:fixed;
+            inset:0;
+            backdrop-filter: blur(15px);
+            background:rgba(0,0,0,0.65);
+            display:flex;
+            flex-direction:column;
+            justify-content:center;
+            align-items:center;
+            z-index:5;
+        }
+
+        .overlay h1{
+            font-size:34px;
+            margin-bottom:25px;
+            text-shadow:0 0 25px #00f5ff;
+        }
+
+        .overlay button{
+            padding:16px 45px;
+            font-size:22px;
+            border:none;
+            border-radius:14px;
+            background:#00f5ff;
+            box-shadow:0 0 25px #00f5ff;
+            cursor:pointer;
+        }
+
+        #winLine{
+            position:absolute;
+            height:5px;
+            background:white;
+            box-shadow:0 0 20px white;
+            transform-origin:left center;
+            display:none;
+            z-index:3;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="turnIndicator" id="turn"></div>
+<div class="board" id="board"></div>
+<div id="winLine"></div>
+
+<div class="overlay" id="overlay">
+    <h1 id="overlayText">Neon Tic Tac Toe</h1>
+    <button id="overlayBtn">START</button>
+</div>
+
+<script>
+const boardEl = document.getElementById("board");
+const turnEl = document.getElementById("turn");
+const overlay = document.getElementById("overlay");
+const overlayText = document.getElementById("overlayText");
+const overlayBtn = document.getElementById("overlayBtn");
+const winLine = document.getElementById("winLine");
+
+let board = Array(9).fill(null);
+let lastWinner = null;
+let currentPlayer = null;
+let gameActive = false;
+
+const wins = [
+ [0,1,2],[3,4,5],[6,7,8],
+ [0,3,6],[1,4,7],[2,5,8],
+ [0,4,8],[2,4,6]
+];
+
+function createBoard(){
+    boardEl.innerHTML="";
+    board.forEach((_,i)=>{
+        const cell=document.createElement("div");
+        cell.className="cell";
+        cell.onclick=()=>play(i);
+        boardEl.appendChild(cell);
+    });
+}
+
+function setTurnUI(){
+    turnEl.className="turnIndicator";
+    if(currentPlayer==="X"){
+        turnEl.classList.add("blueTurn");
+        turnEl.innerText="Blue Player — Your Turn";
+    }else{
+        turnEl.classList.add("redTurn");
+        turnEl.innerText="Red Player — Your Turn";
+    }
+}
+
+function play(i){
+    if(!gameActive || board[i]) return;
+
+    board[i] = currentPlayer;
+    const cells = document.querySelectorAll(".cell");
+    cells[i].innerHTML = `<div class="symbol">${currentPlayer}</div>`;
+
+    const winner = checkWin();
+    if (winner) {
+        lastWinner = winner;
+        gameActive = false;
+
+        // ✅ Draw line first, wait 1 second, then overlay
+        setTimeout(() => {
+            showEnd(winner);
+        }, 1000);
+
+        return;
+    }
+
+    // Draw check
+    if (board.filter(x => x !== null).length === 9) {
+        gameActive = false;
+
+        // Delay overlay for 1 second (optional)
+        setTimeout(() => {
+            showEnd(null);
+        }, 1000);
+
+        return;
+    }
+
+    currentPlayer = currentPlayer === "X" ? "O" : "X";
+    setTurnUI();
+}
+
+function checkWin(){
+    for(let line of wins){
+        const [a,b,c]=line;
+        if(board[a] && board[a]===board[b] && board[a]===board[c]){
+            drawWinLine(a,c);
+            return board[a];
+        }
+    }
+    return null;
+}
+
+function drawWinLine(start,end){
+    const cells=document.querySelectorAll(".cell");
+    const r1=cells[start].getBoundingClientRect();
+    const r2=cells[end].getBoundingClientRect();
+
+    const x1=r1.left+r1.width/2;
+    const y1=r1.top+r1.height/2;
+    const x2=r2.left+r2.width/2;
+    const y2=r2.top+r2.height/2;
+
+    const length=Math.hypot(x2-x1,y2-y1);
+    const angle=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+
+    winLine.style.width = length + "px";
+    winLine.style.left = x1 + "px";
+    winLine.style.top = y1 + "px";
+    winLine.style.transform = `rotate(${angle}deg)`;
+    winLine.style.display = "block";
+}
+
+function showEnd(winner){
+    overlay.style.display = "flex";
+
+    if(winner){
+        overlayText.innerText =
+            `Congratulations ${winner==="X"?"Blue":"Red"} Wins!`;
+    } else {
+        overlayText.innerText = "It's a Draw!";
+    }
+
+    overlayBtn.innerText = "REPLAY";
+}
+
+function startGame(){
+    board=Array(9).fill(null);
+    winLine.style.display="none";
+    createBoard();
+    gameActive=true;
+    overlay.style.display="none";
+
+    currentPlayer = lastWinner ? lastWinner : (Math.random()<0.5?"X":"O");
+    setTurnUI();
+}
+
+overlayBtn.onclick = startGame;
+
+// initial board behind blur
+createBoard();
+</script>
+
+</body>
+</html>
